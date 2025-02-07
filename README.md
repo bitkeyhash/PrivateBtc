@@ -52,7 +52,10 @@ Before you embark on your adventure, make sure you have your ticket ready:
    - Base58 encoding for the final address
 
 4. **CSV Output:**
-   At the end of your adventure, receive a souvenir in the form of a CSV file containing all the private keys and wallet addresses you generated. A memory to cherish forever!
+   At the end of your adventure, receive a souvenir in the form of a CSV file containing all the private keys and wallet addresses you generated. A memory to cherish forever! Name of output csv :
+   ```markdown
+   bitcoin_keys.csv
+   ```
 
 ## 🎢 Join the Fun
 
