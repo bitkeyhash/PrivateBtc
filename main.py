@@ -8,9 +8,36 @@ import ecdsa
 import time
 from threading import Thread
 from colorama import Fore, Style, init
+from termcolor import colored
 
 # Initialize colorama
 init(autoreset=True)
+
+# Function to print ASCII logo with multiple colors
+def print_logo():
+    logo = """
+***********************************
+* ____       _            _       *
+*|  _ \ _ __(_)_   ____ _| |_ ___ *
+*| |_) | '__| \ \ / / _` | __/ _ \*
+*|  __/| |  | |\ V / (_| | ||  __/*
+*|_|   |_|__|_| \_/ \__,_|\__\___|*
+*        | __ )| |_ ___           *
+*        |  _ \| __/ __|          *
+*        | |_) | || (__           *
+*        |____/ \__\___|          *
+***********************************
+"""
+    for line in logo.split('\n'):
+        colored_line = ''
+        for char in line:
+            if char in "*|":
+                colored_line += colored(char, 'yellow')
+            elif char.isalpha():
+                colored_line += colored(char, 'cyan')
+            else:
+                colored_line += char
+        print(colored_line)
 
 # ---------------------------
 # Helper Functions
@@ -77,6 +104,8 @@ def process_batch(start_range, end_range, batch_size):
 # ---------------------------
 
 def main():
+    print_logo()
+
     START_RANGE = 1
     END_RANGE = 2**256 - 1  # Maximum possible private key value for Bitcoin
 
