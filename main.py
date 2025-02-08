@@ -7,6 +7,10 @@ from queue import Queue
 import ecdsa
 import time
 from threading import Thread
+from colorama import Fore, Style, init
+
+# Initialize colorama
+init(autoreset=True)
 
 # ---------------------------
 # Helper Functions
@@ -105,12 +109,12 @@ def main():
                 results.extend(batch_results)
                 keys_generated += len(batch_results)
             except Exception as e:
-                print(f"Error in worker: {e}")
+                print(f"{Fore.RED}Error in worker: {e}")
 
     # Function to report progress every minute
     def report_progress():
         while keys_generated < total_keys:
-            print(f"Keys generated so far: {keys_generated}/{total_keys}")
+            print(f"{Fore.YELLOW}Keys generated so far: {keys_generated}/{total_keys}")
             time.sleep(10)
 
     # Start progress reporting in a separate thread
@@ -136,8 +140,8 @@ def main():
     end_time = time.time()
     total_time = end_time - start_time
 
-    print(f"CSV file generated successfully with {len(results)} keys!")
-    print(f"Total time taken: {total_time:.2f} seconds")
+    print(f"{Fore.GREEN}CSV file generated successfully with {len(results)} keys!")
+    print(f"{Fore.CYAN}Total time taken: {total_time:.2f} seconds")
 
 
 if __name__ == "__main__":
