@@ -1,13 +1,10 @@
 import csv
 import hashlib
 import base58
-import ecdsa
 import random
-import threading
-from multiprocessing import Process, Queue, Value, Lock
-import time
-import os  # Import os for signal handling
-
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
+import ecdsa
 
 # ---------------------------
 # Helper Functions
@@ -19,15 +16,16 @@ def generate_private_key(start_range, end_range):
     """
     return random.randint(start_range, end_range)
 
+
 def private_key_to_public_key(private_key):
     """
     Derive the public key from the private key using ECDSA.
     """
-    # Secp256k1 curve parameters
     sk = ecdsa.SigningKey.from_string(private_key.to_bytes(32, 'big'), curve=ecdsa.SECP256k1)
     vk = sk.verifying_key
     public_key = b'\x04' + vk.to_string()  # Uncompressed public key format
     return public_key
+
 
 def public_key_to_address(public_key):
     """
@@ -55,32 +53,17 @@ def public_key_to_address(public_key):
     return wallet_address.decode('utf-8')
 
 
-def worker(task_queue, result_queue, start_range, end_range, running):
+def process_batch(start_range, end_range, batch_size):
     """
-    Worker function to generate private keys and derive addresses.  Takes a
-    'running' Value to signal termination.
+    Generate a batch of private keys and their corresponding wallet addresses.
     """
-    while running.value:  # Check the shared running flag
-        try:
-            # Use get with a timeout to allow checking 'running'
-            task = task_queue.get(timeout=0.1)
-            if task is None:  # Use a sentinel value to signal termination
-                break
-            
-            # Generate private key
-            private_key = generate_private_key(start_range, end_range)
-            
-            # Derive public key and wallet address
-            public_key = private_key_to_public_key(private_key)
-            wallet_address = public_key_to_address(public_key)
-            
-            # Put result into the result queue
-            result_queue.put((private_key, wallet_address))
-        except Exception as e:
-            # More specific queue handling (Empty exception)
-            if 'Empty' not in str(e): #check if the error is really an empty queue exception.
-              print(f"Error in worker: {e}")
-        
+    results = []
+    for _ in range(batch_size):
+        private_key = generate_private_key(start_range, end_range)
+        public_key = private_key_to_public_key(private_key)
+        wallet_address = public_key_to_address(public_key)
+        results.append((private_key, wallet_address))
+    return results
 
 
 # ---------------------------
@@ -88,61 +71,43 @@ def worker(task_queue, result_queue, start_range, end_range, running):
 # ---------------------------
 
 def main():
-    # Define the range for private key generation
     START_RANGE = 1
     END_RANGE = 2**256 - 1  # Maximum possible private key value for Bitcoin
     
-    # Number of threads/processes
-    NUM_WORKERS = 8  # Adjust based on your CPU cores
-    
-    # Task and result queues
+    NUM_WORKERS = 8  # Adjust based on your CPU cores or workload
+    NUM_TASKS = 1000  # Total number of keys to generate
+    BATCH_SIZE = 10   # Number of keys to process in each batch
+
     task_queue = Queue()
-    result_queue = Queue()
     
-    # Shared variable to signal workers to stop
-    running = Value('b', True)  # 'b' for boolean, initialized to True
-    
-    # Fill the task queue with dummy tasks (one per worker iteration)
-    NUM_TASKS = 1000000  # Adjust based on how many keys you want to generate
-    for _ in range(NUM_TASKS):
-        task_queue.put(1)  # Dummy task
+    # Fill the task queue with batch sizes
+    for _ in range(NUM_TASKS // BATCH_SIZE):
+        task_queue.put(BATCH_SIZE)
 
-    # Add sentinel values to signal workers to stop after processing tasks
-    for _ in range(NUM_WORKERS):
-      task_queue.put(None)
+    results = []
 
-    
-    # Start workers (using multiprocessing for better performance)
-    processes = []
-    for _ in range(NUM_WORKERS):
-        p = Process(target=worker, args=(task_queue, result_queue, START_RANGE, END_RANGE, running))
-        processes.append(p)
-        p.start()
-    
-    try:
-        # Wait for all workers to finish, with a timeout
-        for p in processes:
-            p.join(timeout=60)  # Timeout after 60 seconds (adjust as needed)
-    except KeyboardInterrupt:
-        print("Caught KeyboardInterrupt, terminating workers...")
-        running.value = False  # Signal all workers to stop
-        for p in processes:
-            p.terminate() # Forcefully terminate the process
-            p.join() # Wait for the process to clean up
+    def worker():
+        while not task_queue.empty():
+            try:
+                batch_size = task_queue.get_nowait()
+                batch_results = process_batch(START_RANGE, END_RANGE, batch_size)
+                results.extend(batch_results)
+            except Exception as e:
+                print(f"Error in worker: {e}")
 
-    
-    # Collect results and write to CSV
+    # Use ThreadPoolExecutor for parallelism
+    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        executor.map(lambda _: worker(), range(NUM_WORKERS))
+
+    # Write results to CSV file
     with open('bitcoin_keys.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(['Private Key', 'Wallet Address'])  # Header
-        
-        while not result_queue.empty():
-            private_key, wallet_address = result_queue.get()
-            writer.writerow([private_key, wallet_address])
-    
+        writer.writerow(['Private Key', 'Wallet Address'])
+        writer.writerows(results)
+
     print("CSV file generated successfully!")
+
 
 if __name__ == "__main__":
     main()
-
-
+    
