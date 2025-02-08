@@ -1,3 +1,4 @@
 ecdsa
 base58
 colorama
+termcolor
