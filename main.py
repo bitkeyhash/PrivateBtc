@@ -15,7 +15,7 @@ init(autoreset=True)
 
 # Function to print ASCII logo with multiple colors
 def print_logo():
-    logo = """
+    logo = 
 ***********************************
 * ____       _            _       *
 *|  _ \ _ __(_)_   ____ _| |_ ___ *
@@ -25,9 +25,8 @@ def print_logo():
 *        | __ )| |_ ___           *
 *        |  _ \| __/ __|          *
 *        | |_) | || (__           *
-*        |____/ \__\___|          *
+*        |____/ \__\___|BitKeyHash*
 ***********************************
-"""
     for line in logo.split('\n'):
         colored_line = ''
         for char in line:
