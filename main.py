@@ -5,6 +5,8 @@ import random
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 import ecdsa
+import time
+from threading import Thread
 
 # ---------------------------
 # Helper Functions
@@ -73,31 +75,57 @@ def process_batch(start_range, end_range, batch_size):
 def main():
     START_RANGE = 1
     END_RANGE = 2**256 - 1  # Maximum possible private key value for Bitcoin
-    
+
     NUM_WORKERS = 8  # Adjust based on your CPU cores or workload
-    NUM_TASKS = 1000  # Total number of keys to generate
     BATCH_SIZE = 10   # Number of keys to process in each batch
+
+    # Prompt user for the total number of keys to generate
+    total_keys = int(input("Enter the number of Bitcoin keys to generate: "))
+
+    # Calculate the number of tasks (batches) based on batch size
+    num_tasks = total_keys // BATCH_SIZE
+    if total_keys % BATCH_SIZE != 0:
+        num_tasks += 1  # Add one more batch for remaining keys
 
     task_queue = Queue()
     
     # Fill the task queue with batch sizes
-    for _ in range(NUM_TASKS // BATCH_SIZE):
+    for _ in range(num_tasks):
         task_queue.put(BATCH_SIZE)
 
     results = []
+    keys_generated = 0
 
     def worker():
+        nonlocal keys_generated
         while not task_queue.empty():
             try:
                 batch_size = task_queue.get_nowait()
                 batch_results = process_batch(START_RANGE, END_RANGE, batch_size)
                 results.extend(batch_results)
+                keys_generated += len(batch_results)
             except Exception as e:
                 print(f"Error in worker: {e}")
+
+    # Function to report progress every minute
+    def report_progress():
+        while keys_generated < total_keys:
+            print(f"Keys generated so far: {keys_generated}/{total_keys}")
+            time.sleep(10)
+
+    # Start progress reporting in a separate thread
+    progress_thread = Thread(target=report_progress)
+    progress_thread.start()
+
+    # Measure total execution time
+    start_time = time.time()
 
     # Use ThreadPoolExecutor for parallelism
     with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
         executor.map(lambda _: worker(), range(NUM_WORKERS))
+
+    # Wait for the progress thread to finish
+    progress_thread.join()
 
     # Write results to CSV file
     with open('bitcoin_keys.csv', 'w', newline='') as csvfile:
@@ -105,9 +133,12 @@ def main():
         writer.writerow(['Private Key', 'Wallet Address'])
         writer.writerows(results)
 
-    print("CSV file generated successfully!")
+    end_time = time.time()
+    total_time = end_time - start_time
+
+    print(f"CSV file generated successfully with {len(results)} keys!")
+    print(f"Total time taken: {total_time:.2f} seconds")
 
 
 if __name__ == "__main__":
     main()
-    
